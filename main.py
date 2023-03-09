@@ -3,17 +3,46 @@ from urllib.request import urlopen, Request
 import re
 import streamlit as st
 
-url_input = "https://www.youtube.com/@theone2871"
-
-data = []
+# data = []
 
 
-def channel_id(url_input):
+def gather_data(url_input):
+    return home_page(url_input) | about_page(url_input)
+
+
+def home_page(url_input):
     try:
         url_opener = urlopen(
-            Request(url_input, headers={'User-Agent': 'Chrome'}))
+            Request(url_input, headers={'User-Agent': 'Chrome', 'Accept-Language': 'en-US,en;q=0.5'}))
         soup = bs(url_opener, features="html.parser")
 
+        return dict(
+            channel_id=channel_id(soup),
+            sub_count=sub_count(soup)
+        )
+    except Exception as e:
+        return e
+
+
+def about_page(url_input):
+    try:
+        url_input_about = url_input + "/about"
+        url_opener = urlopen(Request(url_input_about, headers={
+                             'User-Agent': 'Chrome', 'Accept-Language': 'en-US,en;q=0.5'}))
+        soup = bs(url_opener, features="html.parser")
+
+        return dict(
+            views=views(soup),
+            description=description(soup),
+            location=location(soup),
+            joined_date=joined_date(soup)
+        )
+    except Exception as e:
+        return e
+
+
+def channel_id(soup):
+    try:
         result = soup.find(href=re.compile("channel_id"))
         # for result in results:
         href = result.get('href')
@@ -27,12 +56,8 @@ def channel_id(url_input):
         return e
 
 
-def sub_count(url_input):
+def sub_count(soup):
     try:
-        url_opener = urlopen(
-            Request(url_input, headers={'User-Agent': 'Chrome'}))
-        soup = bs(url_opener, features="html.parser")
-
         result_sub = soup.find(string=re.compile("subscriberCountText"))
 
         last_found = None
@@ -51,13 +76,8 @@ def sub_count(url_input):
         return e
 
 
-def views(url_input):
+def views(soup):
     try:
-        url_input_about = url_input + "/about"
-        url_opener = urlopen(
-            Request(url_input_about, headers={'User-Agent': 'Chrome'}))
-        soup = bs(url_opener, features="html.parser")
-
         result = soup.find(string=re.compile("viewCountText"))
 
         last_found = None
@@ -77,6 +97,88 @@ def views(url_input):
         return e
 
 
+def description(soup):
+    try:
+        result = soup.find(string=re.compile(
+            '"channelAboutFullMetadataRenderer":{"description":{"'))
+
+        if result is None:
+            return "Description N/A"
+
+        last_found = None
+        for m in re.finditer('channelAboutFullMetadataRenderer', str(result)):
+            last_found = m.start()
+
+        if last_found is None:
+            return "Description N/A"
+
+        text_begins = result[last_found+64:]
+
+        text_found = text_begins.split('"}')[0]
+
+        return text_found
+    except Exception as e:
+        return e
+
+
+def location(soup):
+    try:
+        result = soup.find(string=re.compile(
+            '"country":{"simpleText"'))
+
+        if result is None:
+            return "Location N/A"
+
+        last_found = None
+        for m in re.finditer('"country":{"simpleText"', str(result)):
+            last_found = m.start()
+
+        if last_found is None:
+            return "Location N/A"
+
+        text_begins = result[last_found+25:]
+
+        text_found = text_begins.split('"}')[0]
+
+        return text_found
+    except Exception as e:
+        return e
+
+
+def joined_date(soup):
+    try:
+        result = soup.find(string=re.compile(
+            'joinedDateText'))
+
+        if result is None:
+            return "Joined date N/A"
+
+        last_found = None
+        for m in re.finditer('joinedDateText', str(result)):
+            last_found = m.start()
+
+        if last_found is None:
+            return "Joined date N/A"
+
+        text_begins = result[last_found+53:]
+
+        text_found = text_begins.split('"}')[0]
+
+        return text_found
+    except Exception as e:
+        return e
+
+
+# url_input = "https://www.youtube.com/@dailysquare8511"
+# url_input_about = url_input + "/about"
+# url_opener = urlopen(Request(url_input_about, headers={
+#                              'User-Agent': 'Chrome', 'Accept-Language': 'en-US,en;q=0.5'}))
+# soup = bs(url_opener, features="html.parser")
+# print(joined_date(soup))
+
+# print(gather_data("https://www.youtube.com/@dailysquare8511"))  # with desc
+# print(gather_data("https://www.youtube.com/@myanmargossip6519"))  # without desc
+
 with st.form("my_form", clear_on_submit=True):
     url = st.text_input(
         'Youtube URL:', placeholder='https://www.youtube.com/@theone2871')
@@ -86,8 +188,13 @@ with st.form("my_form", clear_on_submit=True):
         if not url.strip():
             st.write("URL is missing")
         else:
-            st.write("Channel URL:", url)
+            st.write(url)
             with st.spinner(text='Extracting data…'):
-                st.write("Channel id:", channel_id(url))
-                st.write("Subscriber count:", sub_count(url))
-                st.write("Viewer count:", views(url))
+                data = gather_data(url)
+
+                st.write(data["channel_id"])
+                st.write(data["description"])
+                st.write(data["sub_count"])
+                st.write(data["joined_date"])
+                st.write(data["views"])
+                st.write(data["location"])
