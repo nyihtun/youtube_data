@@ -35,14 +35,17 @@ def sub_count(url_input):
 
         result_sub = soup.find(string=re.compile("subscriberCountText"))
 
-        aft_subscriber_count_text = result_sub[result_sub.find(
-            "subscriberCountText"):]
+        last_found = None
+        for m in re.finditer('subscriberCountText', str(result_sub)):
+            last_found = m.start()
+
+        if last_found is None:
+            return "Unknown subscriber count"
+
+        aft_subscriber_count_text = result_sub[last_found:]
         simple_text = aft_subscriber_count_text[aft_subscriber_count_text.find(
             "simpleText")+13:]
 
-        # sub_count = simple_text.split(" ")[0].replace(",", ".")
-
-        # data.append(dict(sub_count=sub_count))
         return simple_text.split(" ")[0].replace(",", ".")
     except Exception as e:
         return e
@@ -55,9 +58,16 @@ def views(url_input):
             Request(url_input_about, headers={'User-Agent': 'Chrome'}))
         soup = bs(url_opener, features="html.parser")
 
-        results = soup.find(string=re.compile("viewCountText"))
+        result = soup.find(string=re.compile("viewCountText"))
 
-        aft_view_count = results[results.find("viewCountText")+30:]
+        last_found = None
+        for m in re.finditer('viewCountText', str(result)):
+            last_found = m.start()
+
+        if last_found is None:
+            return "Unknown viewer count"
+
+        aft_view_count = result[last_found+30:]
 
         view_count_text = aft_view_count.split(" ")[0]
 
@@ -76,6 +86,7 @@ with st.form("my_form", clear_on_submit=True):
         if not url.strip():
             st.write("URL is missing")
         else:
+            st.write("Channel URL:", url)
             with st.spinner(text='Extracting data…'):
                 st.write("Channel id:", channel_id(url))
                 st.write("Subscriber count:", sub_count(url))
